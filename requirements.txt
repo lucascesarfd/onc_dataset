@@ -1,0 +1,14 @@
+jupyter
+pandas
+numpy
+sndfile
+librosa
+sklearn
+pyarrow
+feather-format
+onc
+lpais 
+ujson
+geopy
+folium
+tqdm
