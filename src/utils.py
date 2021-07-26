@@ -73,5 +73,17 @@ def get_hydrophone_deployments(deployments_directory):
     return hydrophone_deployments
 
 
+def timestamp_iso_to_zulu(_timestamp):
+    return _timestamp.replace('+00:00', 'Z')
+
+
+def timestamp_zulu_to_iso(_timestamp):
+    return _timestamp.replace('Z', '+00:00')
+
+
+def pandas_timestamp_to_onc_format(_timestamp):
+    return _timestamp.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+
+
 def pandas_timestamp_to_zulu_format(_timestamp):
-    return _timestamp.strftime("%Y%m%dT%H%M%S.%f")[:-3] + "Z"
+    return _timestamp.strftime('%Y%m%dT%H%M%S.%f')[:-3] + 'Z'
