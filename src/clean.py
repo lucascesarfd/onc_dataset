@@ -1,5 +1,7 @@
 import os
+import re
 import time
+from tqdm import tqdm
 import geopy.distance
 import multiprocessing 
 
@@ -101,7 +103,7 @@ def clean_for_chunk(
         method="ffill"
     )
 
-    # Drop messages where there are positional coordinates.
+    # Drop messages where there are no positional coordinates.
     data_frame = data_frame[data_frame.x.notna() & data_frame.y.notna()]
 
     # Drop duplicate messages.
@@ -140,6 +142,11 @@ def clean_ais_data(
     _inclusion_radius,
     use_all_threads=False,
 ):
+    '''
+    This function produces the feather files from the JSON inputed files
+    according some restrictions. The new feather file will contain only
+    data there is within te inclusion radius and that have positional data.
+    '''
 
     # Threading differences between systems.
     number_of_threads = get_num_of_threads(use_all_threads)
@@ -147,12 +154,29 @@ def clean_ais_data(
     # Read in the hydrophone deployments as we will treat each deployment as an individual dataset.
     hydrophone_deployments = get_hydrophone_deployments(deployment_directory)
 
-    # Find all of the parsed AIS files for each deployment.
-    parsed_ais_files = [file for file in os.listdir(parsed_ais_directory)]
-    parsed_ais_files.sort(
+    print(f"Finding available JSON files to clean...")
+    # List available JSON files to clean in the input folder.
+    available_files = os.listdir(parsed_ais_directory)
+    available_files.sort()
+    print(f"  Found {bcolors.BOLD}{len(available_files)}{bcolors.ENDC} JSON files to clean")
+
+    # List existing cleaned files in the destination folder.
+    existing_files = os.listdir(clean_ais_directory)
+    existing_files.sort()
+    print(f"  Found {bcolors.BOLD}{len(existing_files)}{bcolors.ENDC} existing Feather files")
+
+    print(f"Working out what files need cleaning...")
+    files_to_clean = [file for file in available_files if re.sub("_parsed.json", "_cleaned.feather", file) not in existing_files]
+    print(f"  There are {bcolors.BOLD}{len(files_to_clean)}{bcolors.ENDC} files to clean")
+    files_to_clean.sort(
         key=lambda f: os.stat(os.path.join(parsed_ais_directory, f)).st_size,
-        reverse=True,
+        reverse=False,
     )
+
+    # If there is no files to clean, terminate the execution.
+    if not files_to_clean:
+        print(f"{bcolors.WARNING}No files to clean.{bcolors.ENDC}")
+        return
 
     for device in hydrophone_deployments.keys():
         for deployment in hydrophone_deployments[device].itertuples(index=False):
@@ -165,7 +189,7 @@ def clean_ais_data(
 
             deployment_ais_data_files = []
 
-            for file in parsed_ais_files:
+            for file in files_to_clean:
                 file_timestamp = pd.Timestamp(file.split("_")[1])
 
                 if deployment_begin <= file_timestamp <= deployment_end:
@@ -194,7 +218,6 @@ def clean_ais_data(
 
             # Clean the data.
             print("Cleaning AIS data from deployment...")
-            start_time = time.time()
             threading_pool = multiprocessing.Pool(processes=number_of_threads)
             function_partial = partial(
                 clean_for_chunk,
@@ -209,13 +232,8 @@ def clean_ais_data(
                 coarse_latitude_bottom_bound,
             )
 
-            threading_pool.imap_unordered(
-                function_partial, deployment_ais_data_files, chunksize=1
-            )
+            for _ in tqdm(threading_pool.imap_unordered(function_partial, deployment_ais_data_files, chunksize=1), total=len(deployment_ais_data_files)):
+                pass
+
             threading_pool.close()
             threading_pool.join()
-            print(
-                "  This took {0:.3f} seconds to process...".format(
-                    time.time() - start_time
-                )
-            )

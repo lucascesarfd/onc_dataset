@@ -12,3 +12,4 @@ ujson==4.0.2
 geopy==2.2.0
 folium==0.12.1
 tqdm==4.61.2
+pydub==0.25.1

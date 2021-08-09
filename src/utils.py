@@ -5,6 +5,9 @@ import multiprocessing
 import pandas as pd
 import pyarrow.feather as feather
 
+from datetime import datetime
+
+
 
 class bcolors:
     HEADER = "\033[95m"
@@ -87,3 +90,7 @@ def pandas_timestamp_to_onc_format(_timestamp):
 
 def pandas_timestamp_to_zulu_format(_timestamp):
     return _timestamp.strftime('%Y%m%dT%H%M%S.%f')[:-3] + 'Z'
+
+
+def zulu_string_to_datetime(_timestamp):
+    return datetime.strptime(_timestamp, '%Y%m%dT%H%M%S.%f'+'Z')

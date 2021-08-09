@@ -6,6 +6,7 @@ from parse import parse_ais_to_json
 from clean import clean_ais_data
 from combine import combine_deployment_ais_data
 from identify import identify_scenarios
+from format import group_wav_from_range
 
 
 def create_parser():
@@ -35,7 +36,7 @@ def create_parser():
         action='store',
         type=int,
         nargs="+",
-        default=[0, 1, 2, 3, 4, 5, 6],
+        default=[0, 1, 2, 3, 4, 5, 6, 7],
         help="The numbers related to the steps that you want to execute. "
         "By default, all tests are executed."
         "0 - Query ONC deployments; "
@@ -44,7 +45,8 @@ def create_parser():
         "3 - Parse AIS to JSON; "
         "4 - Clean AIS data; "
         "5 - Combine deployment AIS data; "
-        "6 - Identify scenarios.",
+        "6 - Identify scenarios; "
+        "7 - Classify WAV files from range.",
     )
 
     return parser
@@ -67,6 +69,7 @@ def _main():
     combined_deployment_directory = create_dir(working_directory, "05_combined_deployment_ais_data")
     scenario_intervals_directory = create_dir(working_directory, "06a_scenario_intervals")
     interval_ais_data_directory = create_dir(working_directory, "06b_interval_ais_data")
+    classified_wav_directory = create_dir(working_directory, "07_classified_wav_files")
 
     #token = "155f45d8-30ec-4e7f-a866-167c7d424635"
     token = args.onc_token
@@ -75,14 +78,14 @@ def _main():
     inclusion_radius = 15000.0
 
     if 0 in args.steps:
-        print(f"{bcolors.HEADER}Querying Ocean Natworks Canada for Deployments{bcolors.ENDC}")
+        print(f"\n{bcolors.HEADER}Querying Ocean Natworks Canada for Deployments{bcolors.ENDC}")
         query_onc_deployments(
             deployment_directory,
             token,
         )
 
     if 1 in args.steps:
-        print(f"{bcolors.HEADER}Downloading AIS Files{bcolors.ENDC}")
+        print(f"\n{bcolors.HEADER}Downloading AIS Files{bcolors.ENDC}")
         download_files(
             raw_ais_directory,
             deployment_directory,
@@ -91,7 +94,7 @@ def _main():
         )
 
     if 2 in args.steps:
-        print(f"{bcolors.HEADER}Downloading Raw WAV Files{bcolors.ENDC}")
+        print(f"\n{bcolors.HEADER}Downloading Raw WAV Files{bcolors.ENDC}")
         download_files(
             raw_wav_directory,
             deployment_directory,
@@ -100,7 +103,7 @@ def _main():
         )
 
     if 3 in args.steps:
-        print(f"{bcolors.HEADER}Parsing AIS files to JSON files{bcolors.ENDC}")
+        print(f"\n{bcolors.HEADER}Parsing AIS files to JSON files{bcolors.ENDC}")
         parse_ais_to_json(
             raw_ais_directory,
             parsed_ais_directory,
@@ -108,7 +111,7 @@ def _main():
         )
 
     if 4 in args.steps:
-        print(f"{bcolors.HEADER}Cleaning AIS data{bcolors.ENDC}")
+        print(f"\n{bcolors.HEADER}Cleaning AIS data{bcolors.ENDC}")
         clean_ais_data(
             deployment_directory,
             parsed_ais_directory,
@@ -118,7 +121,7 @@ def _main():
         )
 
     if 5 in args.steps:
-        print(f"{bcolors.HEADER}Combining Deployment AIS data{bcolors.ENDC}")
+        print(f"\n{bcolors.HEADER}Combining Deployment AIS data{bcolors.ENDC}")
         # This will run the shortest hydrophone deployment to speed up development.
         run_shortest = False
         combine_deployment_ais_data(
@@ -131,13 +134,22 @@ def _main():
         )
 
     if 6 in args.steps:
-        print(f"{bcolors.HEADER}Identifying scenarios{bcolors.ENDC}")
+        print(f"\n{bcolors.HEADER}Identifying scenarios{bcolors.ENDC}")
         identify_scenarios(
             working_directory,
             deployment_directory,
             scenario_intervals_directory,
             interval_ais_data_directory,
             combined_deployment_directory,
+        )
+
+    if 7 in args.steps:
+        print(f"\n{bcolors.HEADER}Classifying dataset into the choosed range{bcolors.ENDC}")
+        group_wav_from_range(
+            classified_wav_directory,
+            scenario_intervals_directory,
+            raw_wav_directory,
+            1000,
         )
 
 

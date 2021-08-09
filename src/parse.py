@@ -1,6 +1,7 @@
 import os
 import re
 import time
+from tqdm import tqdm
 import ujson
 
 import numpy as np
@@ -228,38 +229,34 @@ def parse_all_valid_messages(
 def parse_ais_to_json(
     raw_ais_directory, parsed_ais_directory, single_threaded_processing=True
 ):
+    '''
+    This function parse the ais messages downloaded from ONC into JSON files,
+    filtering by the type of the messages and discarting messages without the
+    needed values.
+    '''
 
     print(f"Finding available AIS files to parse...")
     # List available RAW files to parse in the input folder.
     available_files = os.listdir(raw_ais_directory)
     available_files.sort()
+    print(f"  Found {bcolors.BOLD}{len(available_files)}{bcolors.ENDC} AIS files to parse")
 
     # List existing parsed files in the destination folder.
     existing_files = os.listdir(parsed_ais_directory)
     existing_files.sort()
-    print(f"  Found {len(existing_files)} existing JSON files")
+    print(f"  Found {bcolors.BOLD}{len(existing_files)}{bcolors.ENDC} existing JSON files")
 
     print(f"Working out what files need parsing...")
     files_to_parse = [file for file in available_files if file not in existing_files]
+    print(f"  There are {bcolors.BOLD}{len(files_to_parse)}{bcolors.ENDC} files to parse")
 
     print(f"Beginning to parse AIS files now...")
     if single_threaded_processing:
         if files_to_parse:
-            for file in files_to_parse:
-                file_name = os.path.split(file)
-                print(f"Parsing {bcolors.BOLD}{file_name[-1]}{bcolors.ENDC} file..")
-                start_time = time.time()
+            for file in tqdm(files_to_parse):
                 parse_all_valid_messages(file, raw_ais_directory, parsed_ais_directory)
-                print(
-                    "  This file took {0:.3f} seconds to parse and dump".format(
-                        time.time() - start_time
-                    )
-                )
-
         else:
-            print(
-                f"{bcolors.WARNING}No files to download, terminating program now{bcolors.ENDC}"
-            )
+            print(f"{bcolors.WARNING}No files to parse.{bcolors.ENDC}")
 
     else:
         print("Begin Multi threading processing...")
@@ -270,7 +267,8 @@ def parse_ais_to_json(
             _raw_data_directory=raw_ais_directory,
             _parsed_data_directory=parsed_ais_directory,
         )
-        thread_pool.map(arguments, available_files)
+        for _ in tqdm(thread_pool.imap(arguments, available_files), total=len(available_files)):
+            pass
         thread_pool.close()
         thread_pool.join()
         print(

@@ -5,6 +5,8 @@ import multiprocessing
 import numpy as np
 import pandas as pd
 
+from tqdm import tqdm
+
 from utils import (
     get_num_of_threads,
     get_hydrophone_deployments,
@@ -32,6 +34,11 @@ def generate_time_steps(_row_pd_timestamp, _row_time_difference, _minimum_delta)
 
 
 def interpolation_for_chunks(_chunk):
+    '''
+    Interpolate the location data to generate new entries with more regularity.
+    The new interpolated data will be generated if two values are separated for
+    a time greater than minimum_delta and smaller than maximum_delta.
+    '''
 
     # Seconds between timestamps.
     minimum_delta = np.timedelta64(20, "s")
@@ -58,6 +65,8 @@ def interpolation_for_chunks(_chunk):
         _chunk = _chunk.sort_values(by="pd_timestamp", ignore_index=True)
         _chunk = _chunk.drop(labels=["time_difference", "to_interpolate"], axis=1)
 
+        _chunk["x"] = _chunk["x"].interpolate()
+        _chunk["y"] = _chunk["y"].interpolate()
         _chunk["sog"] = _chunk["sog"].interpolate()
         _chunk["cog"] = _chunk["cog"].interpolate()
         _chunk["true_heading"] = _chunk["true_heading"].interpolate()
@@ -65,6 +74,7 @@ def interpolation_for_chunks(_chunk):
             "distance_to_hydrophone"
         ].interpolate()
 
+        _chunk["id"] = _chunk["id"].fillna(method="ffill")
         _chunk["mmsi"] = _chunk["mmsi"].fillna(method="ffill")
         _chunk["type_and_cargo"] = _chunk["type_and_cargo"].fillna(method="ffill")
 
@@ -84,6 +94,12 @@ def combine_deployment_ais_data(
     _inclusion_radius=15000.0,
     use_all_threads=False,
 ):
+    '''
+    This function combines the feather files from the same deployment into one
+    unique cleaned file. It also generate a new interpolated file, with values
+    for the loaction with more granularity with values generated from the linear
+    interpolation of the real ais messages from the original feather files.
+    '''
 
     # Threading differences between systems.
     number_of_threads = get_num_of_threads(use_all_threads)
@@ -219,8 +235,13 @@ def combine_deployment_ais_data(
             grouped_data.sort(key=lambda x: x.shape[0], reverse=True)
 
             threading_pool = multiprocessing.Pool(processes=number_of_threads)
-            outputs = threading_pool.imap_unordered(
-                interpolation_for_chunks, grouped_data, chunksize=1
+            outputs = list(
+                tqdm(
+                    threading_pool.imap_unordered(
+                        interpolation_for_chunks, grouped_data, chunksize=1
+                    ),
+                    total=len(grouped_data)
+                )
             )
             threading_pool.close()
             threading_pool.join()

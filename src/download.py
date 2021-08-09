@@ -1,14 +1,14 @@
 import os
 import time
-import tqdm
 import os.path
 import multiprocessing
 
 
 import pandas as pd
 
-from functools import partial
+from tqdm import tqdm
 from onc.onc import ONC
+from functools import partial
 
 from utils import bcolors
 
@@ -51,7 +51,7 @@ def download_file_list(output_directory, token, files_to_download):
     start_time = time.time()
     thread_pool = multiprocessing.Pool(20)
     arguments = partial(download_onc_file, _token=token, _path=output_directory)
-    for _ in tqdm.tqdm(thread_pool.imap(arguments, files_to_download), total=len(files_to_download)):
+    for _ in tqdm(thread_pool.imap(arguments, files_to_download), total=len(files_to_download)):
         pass
     thread_pool.close()
     thread_pool.join()
