@@ -149,7 +149,7 @@ def _main():
             classified_wav_directory,
             scenario_intervals_directory,
             raw_wav_directory,
-            1000,
+            2000,
         )
 
 

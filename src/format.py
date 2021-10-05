@@ -86,7 +86,6 @@ def group_wav_from_range(classified_wav_directory, scenario_interval_dir, raw_wa
     background_save_dir = create_dir(range_directory, "background")
     split_and_save_wav(raw_wav_directory, background_save_dir, background_data_from_range, wav_file_names)
 
-
     # Read vessel intervals range data from csv.
     vessel_interval_file_names = [file for file in interval_file_names if file.lower().endswith('unique_vessel_intervals.csv')]
     vessel_interval_data = pd.read_csv(os.path.join(scenario_interval_dir, vessel_interval_file_names[0]))
