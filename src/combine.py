@@ -97,7 +97,7 @@ def combine_deployment_ais_data(
     '''
     This function combines the feather files from the same deployment into one
     unique cleaned file. It also generate a new interpolated file, with values
-    for the loaction with more granularity with values generated from the linear
+    for the location with more granularity with values generated from the linear
     interpolation of the real ais messages from the original feather files.
     '''
 

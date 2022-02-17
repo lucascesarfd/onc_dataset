@@ -6,10 +6,10 @@ import pandas as pd
 from tqdm import tqdm
 from pydub import AudioSegment
 from datetime import datetime, timedelta
-from utils import bcolors, create_dir, zulu_string_to_datetime, pandas_timestamp_to_onc_format
+from utils import bcolors, create_dir, zulu_string_to_datetime, pandas_timestamp_to_onc_format, read_data_frame_from_feather_file
 
 
-def split_and_save_wav(raw_wav_directory, output_save_dir, data_from_range, wav_file_names):
+def split_and_save_wav(raw_wav_directory, output_save_dir, data_from_range, wav_file_names, inclusion_radius=0, interval_ais_data_directory=''):
     # Define project constants.
     five_minutes = timedelta(minutes = 5)
     csv_data_to_fetch = []
@@ -44,6 +44,7 @@ def split_and_save_wav(raw_wav_directory, output_save_dir, data_from_range, wav_
         audio_segment += last_segment[:end_time]
 
         audio_segment.export(os.path.join(output_save_dir, str(file_idx) + ".wav"), format="wav")
+
         csv_data_to_fetch.append(
                 (
                     pandas_timestamp_to_onc_format(ais_begin_datetime),
@@ -61,7 +62,7 @@ def split_and_save_wav(raw_wav_directory, output_save_dir, data_from_range, wav_
     interval_csv_file.close()
 
 
-def group_wav_from_range(classified_wav_directory, scenario_interval_dir, raw_wav_directory, inclusion_radius):
+def group_wav_from_range(classified_wav_directory, scenario_interval_dir, interval_ais_data_directory, raw_wav_directory, inclusion_radius):
 
     # Define exclusion range as an offset from the inclusion.
     exclusion_radius = 2000 + inclusion_radius
@@ -96,6 +97,6 @@ def group_wav_from_range(classified_wav_directory, scenario_interval_dir, raw_wa
     # Identify, split, and save corresponding wav files into the directory.
     print(f"Generating and saving unique vessel within range files.")
     vessel_save_dir = create_dir(range_directory, "vessel")
-    split_and_save_wav(raw_wav_directory, vessel_save_dir, vessel_data_from_range, wav_file_names)
+    #split_and_save_wav(raw_wav_directory, vessel_save_dir, vessel_data_from_range, wav_file_names, inclusion_radius, interval_ais_data_directory)
 
 

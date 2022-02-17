@@ -39,6 +39,15 @@ def get_deployment_filters(deployment_directory, filter_type="WAV"):
                         "extension": "txt",
                     }
                 )
+            elif filter_type.lower() == "ctd":
+                filters.append(
+                    {
+                        "deviceCode": "SBECTD19p6935",
+                        "dateFrom": row["begin"],
+                        "dateTo": row["end"],
+                        "extension": "txt",
+                    }
+                )
     return filters
 
 

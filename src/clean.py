@@ -1,6 +1,7 @@
 import os
 import re
 import time
+import xmltodict
 from tqdm import tqdm
 import geopy.distance
 import multiprocessing 
@@ -76,6 +77,44 @@ def distance_calculation_for_chunks(
     )
 
     return _chunk
+
+
+def clean_ctd_file_into_feather(raw_ctd_directory, file, clean_ctd_directory):
+
+    file_dir = os.path.join(raw_ctd_directory, file)
+
+    ctd = open(file_dir, "r")
+    final_dict = {}
+    final_dict["date"] = []
+    final_dict["t1"] = []
+    final_dict["c1"] = []
+    final_dict["p1"] = []
+    final_dict["sal"] = []
+    final_dict["sv"] = []
+
+    for line in ctd:
+        date_and_xml = line.split('<?xml')
+        if len(date_and_xml) != 2:
+            continue
+        xml = f'<?xml{date_and_xml[1]}'
+        xml_dict = xmltodict.parse(xml)
+
+        final_dict["date"].append(date_and_xml[0].strip())
+        final_dict["t1"].append(xml_dict["datapacket"]["data"]["t1"])
+        final_dict["c1"].append(xml_dict["datapacket"]["data"]["c1"])
+        final_dict["p1"].append(xml_dict["datapacket"]["data"]["p1"])
+        final_dict["sal"].append(xml_dict["datapacket"]["data"]["sal"])
+        final_dict["sv"].append(xml_dict["datapacket"]["data"]["sv"])
+
+    final_df = pd.DataFrame.from_dict(final_dict)
+
+    # Out it goes.
+    feather_file = os.path.join(
+        clean_ctd_directory, file.replace(".txt", "_cleaned.feather")
+    )
+    dump_data_frame_to_feather_file(feather_file, final_df)
+
+    return
 
 
 def clean_for_chunk(
@@ -237,3 +276,68 @@ def clean_ais_data(
 
             threading_pool.close()
             threading_pool.join()
+
+
+
+def clean_ctd_data(
+    deployment_directory,
+    raw_ctd_directory,
+    clean_ctd_directory,
+    use_all_threads=False,
+):
+    '''
+    This function produces the feather files from original txt files
+    according some restrictions. The new feather file will contain only
+    data there relevant for our application in a more common format.
+    '''
+
+    # Threading differences between systems.
+    number_of_threads = get_num_of_threads(use_all_threads)
+
+    # Read in the hydrophone deployments as we will treat each deployment as an individual dataset.
+    hydrophone_deployments = get_hydrophone_deployments(deployment_directory)
+
+    print(f"Finding available TXT files to clean...")
+    # List available TXT files to clean in the input folder.
+    available_files = os.listdir(raw_ctd_directory)
+    available_files.sort()
+    print(f"  Found {bcolors.BOLD}{len(available_files)}{bcolors.ENDC} TXT files to clean")
+
+    # List existing cleaned files in the destination folder.
+    existing_files = os.listdir(clean_ctd_directory)
+    existing_files.sort()
+    print(f"  Found {bcolors.BOLD}{len(existing_files)}{bcolors.ENDC} existing Feather files")
+
+    print(f"Working out what files need cleaning...")
+    files_to_clean = [file for file in available_files if re.sub(".txt", "_cleaned.feather", file) not in existing_files]
+    print(f"  There are {bcolors.BOLD}{len(files_to_clean)}{bcolors.ENDC} files to clean")
+    files_to_clean.sort(
+        key=lambda f: os.stat(os.path.join(raw_ctd_directory, f)).st_size,
+        reverse=False,
+    )
+
+    # If there is no files to clean, terminate the execution.
+    if not files_to_clean:
+        print(f"{bcolors.WARNING}No files to clean.{bcolors.ENDC}")
+        return
+
+    for device in hydrophone_deployments.keys():
+        for deployment in hydrophone_deployments[device].itertuples(index=False):
+
+            # Get begin and end information from deployment files.
+            deployment_begin = pd.Timestamp(deployment.begin).normalize()
+            deployment_end = pd.Timestamp(deployment.end).normalize() + pd.DateOffset(
+                days=1
+            )
+
+            #deployment_ctd_data_files = []
+
+            for file in tqdm(files_to_clean):
+                file_timestamp = pd.Timestamp(file.split("_")[1].split(".")[0], tz='UTC')
+
+                if deployment_begin <= file_timestamp <= deployment_end:
+                    clean_ctd_file_into_feather(raw_ctd_directory, file, clean_ctd_directory)
+
+    return
+
+

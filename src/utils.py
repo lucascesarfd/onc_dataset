@@ -8,7 +8,6 @@ import pyarrow.feather as feather
 from datetime import datetime
 
 
-
 class bcolors:
     HEADER = "\033[95m"
     OKBLUE = "\033[94m"
@@ -94,3 +93,15 @@ def pandas_timestamp_to_zulu_format(_timestamp):
 
 def zulu_string_to_datetime(_timestamp):
     return datetime.strptime(_timestamp, '%Y%m%dT%H%M%S.%f'+'Z')
+
+
+def get_exclusion_radius(inclusion_radius):
+    return inclusion_radius+2000
+
+
+def get_min_max_normalization(input_value, min_value, max_value):
+    return (input_value - min_value) / (max_value - min_value)
+
+
+def get_min_max_values_from_df(df, columns):
+    return {column: (df[column].astype(float).min(), df[column].astype(float).max()) for column in columns}
