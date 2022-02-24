@@ -40,7 +40,7 @@ def create_parser():
         nargs="+",
         default=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         help="The numbers related to the steps that you want to execute. "
-        "By default, all tests are executed."
+        "By default, all stages are executed."
         "0 - Query ONC deployments; "
         "1 - Download AIS files; "
         "2 - Download WAV files; "
