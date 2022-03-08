@@ -145,7 +145,43 @@ def generate_full_metadata(root_path, clean_ctd_directory, interval_ais_dir, inc
     final_metadata.to_csv(os.path.join(root_path, "metadata.csv"), index=False)
 
 
-def generate_balanced_metadata(metadata_file, root_path):
+def generate_oversampled_metadata(metadata_file, root_path, inbalance_limit=2):
+    classes = ["other", "passengership", "tug", "tanker", "cargo"]
+
+    meta = pd.read_csv(os.path.join(root_path, metadata_file))
+    meta_dict = {label:meta[meta["label"] == label]["duration_sec"].sum() for label in classes}
+
+    bigger_class = max(meta_dict, key=meta_dict.get)
+    smaller_class = min(meta_dict, key=meta_dict.get)
+
+    relation = min(inbalance_limit, meta_dict[bigger_class]/meta_dict[smaller_class])
+
+    final_size = meta_dict[smaller_class] * relation
+    classes_df = []
+
+    for label in classes:
+        sub_metadata = meta[meta["label"] == label].sample(frac=1, random_state=42).reset_index(drop=True)
+        current_size = 0
+        max_row_num = len(sub_metadata.index)
+        row_num = 0
+        rows = []
+        while current_size < final_size:
+            current_size += sub_metadata.iloc[row_num]["duration_sec"]
+            rows.append(row_num)
+            
+            row_num += 1
+            if row_num == max_row_num:
+                classes_df.append(sub_metadata[sub_metadata.index.isin(rows)])
+                row_num = 0
+                rows = []
+        classes_df.append(sub_metadata[sub_metadata.index.isin(rows)])
+
+    file_name = metadata_file.split(".")[0]
+    balanced_set = pd.concat(classes_df, ignore_index=True)
+    balanced_set.sample(frac=1, random_state=42).reset_index(drop=True).to_csv(os.path.join(root_path, f"{file_name}_oversampled.csv"), index=False)
+
+
+def generate_undersampled_metadata(metadata_file, root_path):
     classes = ["other", "passengership", "tug", "tanker", "cargo"]
 
     meta = pd.read_csv(os.path.join(root_path, metadata_file))
@@ -162,7 +198,12 @@ def generate_balanced_metadata(metadata_file, root_path):
                 break
     idx_list = [idx for _, sublist in idx_dict.items() for idx in sublist]
     file_name = metadata_file.split(".")[0]
-    meta[meta.index.isin(idx_list)].to_csv(os.path.join(root_path, f"{file_name}_balanced.csv"), index=False)
+    meta[meta.index.isin(idx_list)].to_csv(os.path.join(root_path, f"{file_name}_undersampled.csv"), index=False)
+
+
+def generate_balanced_metadata(metadata_file, root_path):
+    generate_oversampled_metadata(metadata_file, root_path)
+    generate_undersampled_metadata(metadata_file, root_path)
 
 
 def get_metadata_for_small_times(root_path, metadata_file, seconds):
@@ -207,19 +248,24 @@ def main():
 
     # 1 - Generate the metadata for the full dataset.
     print(f"Generate the metadata for the full dataset")
-    inclusion_radius = 3000
-    root_path = "/workspaces/underwater/dataset/07_classified_wav_files/inclusion_3000_exclusion_5000"
+    inclusion_radius = 4000
+    root_path = "/workspaces/underwater/dataset/07_classified_wav_files/inclusion_4000_exclusion_6000"
     interval_ais_dir = "/workspaces/underwater/dataset/06b_interval_ais_data/"
     clean_ctd_directory = "/workspaces/underwater/dataset/09_cleaned_ctd_files"
     generate_full_metadata(root_path, clean_ctd_directory, interval_ais_dir, inclusion_radius)
 
-    # 2 - Split dataset into small periods of time.
+    # 2 - Generate balanced versions onf the metatdata.
+    print(f"Generate balanced versions of the metatdata")
+    root_path = "/workspaces/underwater/dataset/07_classified_wav_files/inclusion_4000_exclusion_6000"
+    generate_balanced_metadata(f"metadata.csv", root_path)
+
+    # 3 - Split dataset into small periods of time.
     print(f"Split dataset into small periods of time")
     seconds = 10
     metadata_file = os.path.join(root_path, f"metadata.csv")
     get_metadata_for_small_times(root_path, metadata_file, seconds)
 
-    # 3 - Split the original data into train, test and validation datasets.
+    # 4 - Split the original data into train, test and validation datasets.
     print(f"Split dataset into train, test and validation datasets")
     validation_split = 0.2
     test_split = 0.1

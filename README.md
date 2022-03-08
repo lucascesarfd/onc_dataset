@@ -54,7 +54,6 @@ This function parse the ais messages downloaded from ONC into JSON files, filter
 5. Combine the raw and interpolated data frames;
 6. Dump AIS interpolated data to a monolithic `.feather` file;
 
-
 ### Step 6 - Identify scenarios
 1. Find all of the cleaned AIS files for each deployment;
 2. Find the time intervals where only one vessel is within range;
