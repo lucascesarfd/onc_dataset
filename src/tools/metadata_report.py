@@ -1,9 +1,14 @@
+import os
 import pandas as pd
 import matplotlib.pyplot as plt
 
+BASE_DIR = "/workspaces/underwater/dataset/07_classified_wav_files/inclusion_4000_exclusion_6000/metadata/1_second/"
+OUTPUT_DIR = "report"
+METADATA_FILE = "metadata_1s"
+
 def generate_report(metadata_file, output_dir):
     meta = pd.read_csv(metadata_file)
-    classes = ["other", "passengership", "tug", "tanker", "cargo"]
+    classes = ["other", "passengership", "tug", "tanker", "cargo", "background"]
     duration_dict = {}
     data_info = []
 
@@ -46,7 +51,12 @@ def generate_report(metadata_file, output_dir):
     print("Finished")
 
 if __name__ == "__main__":
+    if not os.path.exists(BASE_DIR):
+        print(f"{BASE_DIR} does not exists! Finishing execution.")
+        exit()
+    complete_output_dir = BASE_DIR+OUTPUT_DIR
+    if not os.path.exists(complete_output_dir):
+        print(f"{complete_output_dir} will be created!")
+        os.makedirs(complete_output_dir)
 
-    metadata_file = "/workspaces/underwater/dataset/07_classified_wav_files/inclusion_4000_exclusion_6000/metadata.csv"
-    output_dir = "/workspaces/underwater/dataset/07_classified_wav_files/inclusion_4000_exclusion_6000/report/metadata"
-    generate_report(metadata_file, output_dir)
+    generate_report(BASE_DIR+METADATA_FILE+".csv", complete_output_dir+"/"+METADATA_FILE)
