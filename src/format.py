@@ -30,28 +30,30 @@ def split_and_save_wav(raw_wav_directory, output_save_dir, data_from_range, wav_
 
         wav_files_in_range.sort()
 
-        audio_segment = AudioSegment.from_wav(os.path.join(raw_wav_directory, wav_files_in_range[0][1]))
-        start_time = (wav_files_in_range[0][0] - ais_begin_datetime).total_seconds() * 1000
-        audio_segment = audio_segment[start_time:]
+        try:
+            audio_segment = AudioSegment.from_wav(os.path.join(raw_wav_directory, wav_files_in_range[0][1]))
+            start_time = (wav_files_in_range[0][0] - ais_begin_datetime).total_seconds() * 1000
+            audio_segment = audio_segment[start_time:]
 
-        for idx, (wav_datetime, wav_file_name) in enumerate(wav_files_in_range):
-            if idx == 0 or idx == len(wav_files_in_range):
-                continue
-            audio_segment += AudioSegment.from_wav(os.path.join(raw_wav_directory, wav_file_name))
+            for idx, (wav_datetime, wav_file_name) in enumerate(wav_files_in_range):
+                if idx == 0 or idx == len(wav_files_in_range):
+                    continue
+                audio_segment += AudioSegment.from_wav(os.path.join(raw_wav_directory, wav_file_name))
 
-        last_segment = AudioSegment.from_wav(os.path.join(raw_wav_directory, wav_files_in_range[-1][1]))
-        end_time = (ais_end_datetime - wav_files_in_range[-1][0]).total_seconds() * 1000
-        audio_segment += last_segment[:end_time]
+            last_segment = AudioSegment.from_wav(os.path.join(raw_wav_directory, wav_files_in_range[-1][1]))
+            end_time = (ais_end_datetime - wav_files_in_range[-1][0]).total_seconds() * 1000
+            audio_segment += last_segment[:end_time]
 
-        audio_segment.export(os.path.join(output_save_dir, str(file_idx) + ".wav"), format="wav")
-
-        csv_data_to_fetch.append(
-                (
-                    pandas_timestamp_to_onc_format(ais_begin_datetime),
-                    pandas_timestamp_to_onc_format(ais_end_datetime),
-                    str(file_idx),
+            audio_segment.export(os.path.join(output_save_dir, str(file_idx) + ".wav"), format="wav")
+            csv_data_to_fetch.append(
+                    (
+                        pandas_timestamp_to_onc_format(ais_begin_datetime),
+                        pandas_timestamp_to_onc_format(ais_end_datetime),
+                        str(file_idx),
+                    )
                 )
-            )
+        except:
+            print(f"Error while exporting audio segment")
 
     interval_csv_file = open(os.path.join(output_save_dir, "intervals.csv"), "w")
     interval_csv_file.write("begin,end,wav_file\n")
