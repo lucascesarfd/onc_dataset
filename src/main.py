@@ -1,6 +1,7 @@
 import argparse
 import os
 
+from config import *
 from utils import bcolors, create_dir, get_exclusion_radius
 from download import query_onc_deployments, download_files
 from parse import parse_ais_to_json
@@ -17,9 +18,9 @@ def create_parser():
 
     # Add the arguments
     parser.add_argument(
-        "onc_token",
+        "--onc_token",
         type=str,
-        default="",
+        default=ONC_TOKEN,
         help="The Ocean Networks Canada Token to download the files."
         " It can be obtained at https://wiki.oceannetworks.ca/display/O2KB/Get+your+API+token.",
     )
@@ -28,7 +29,7 @@ def create_parser():
         "--work_dir",
         "-w",
         type=str,
-        default="/workspaces/underwater/dataset",
+        default=WORK_DIR,
         help="The path to the workspace directory.",
     )
 
@@ -38,7 +39,7 @@ def create_parser():
         action='store',
         type=int,
         nargs="+",
-        default=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        default=STEPS,
         help="The numbers related to the steps that you want to execute. "
         "By default, all stages are executed."
         "0 - Query ONC deployments; "
@@ -61,7 +62,7 @@ def create_parser():
         "--max_inclusion_radius",
         "-m",
         type=float,
-        default=15000.0,
+        default=MAX_INCLUSION_RADIUS,
         help="The maximum distance (metres) that a vessel can be from the hydrophone. Used for the whole dataset.",
     )
     
@@ -69,7 +70,7 @@ def create_parser():
         "--inclusion_radius",
         "-i",
         type=int,
-        default=1000,
+        default=INCLUSION_RADIUS,
         help="The maximum distance (metres) that a vessel can be from the hydrophone. Used on the subset",
     )
 
@@ -77,7 +78,7 @@ def create_parser():
         "--seconds",
         "-t",
         type=int,
-        default=10,
+        default=METADATA_SECONDS,
         help="The size of each audio sample in metadata.",
     )
 
@@ -85,8 +86,24 @@ def create_parser():
         "--metadata_file",
         "-f",
         type=str,
-        default="metadata",
+        default=METADATA_FILE,
         help="The name of the metadata file without the extension. Assumed to be .csv",
+    )
+
+    parser.add_argument(
+        "--validation_split",
+        "-vs",
+        type=float,
+        default=METADATA_VAL_SPLIT,
+        help="The proportion reserved from metadata to the validation split"
+    )
+
+    parser.add_argument(
+        "--test_split",
+        "-ts",
+        type=float,
+        default=METADATA_TEST_SPLIT,
+        help="The proportion reserved from metadata to the test split"
     )
 
     return parser
@@ -113,7 +130,6 @@ def _main():
     raw_ctd_directory = create_dir(working_directory, "08_raw_ctd_files")
     clean_ctd_directory = create_dir(working_directory, "09_cleaned_ctd_files")
 
-    #token = "155f45d8-30ec-4e7f-a866-167c7d424635"
     token = args.onc_token
 
     # The maximum distance (metres) that a vessel can be from the hydrophone before we start caring about it.
@@ -125,6 +141,8 @@ def _main():
 
     # The matadata file name.
     metadata_file = args.metadata_file
+    metadata_val_split=args.validation_split
+    metadata_test_split=args.test_split
 
     root_path = os.path.join(classified_wav_directory, f"inclusion_{inclusion_radius}_exclusion_{get_exclusion_radius(inclusion_radius)}")
 
@@ -232,13 +250,6 @@ def _main():
         )
 
     if 11 in args.steps:
-        print(f"\n{bcolors.HEADER}Generating the balanced metadata version{bcolors.ENDC}")
-        generate_balanced_metadata(
-            f"{metadata_file}.csv",
-            root_path,
-        )
-
-    if 12 in args.steps:
         print(f"\n{bcolors.HEADER}Splitting dataset into small periods of time{bcolors.ENDC}")
         get_metadata_for_small_times(
             root_path,
@@ -246,13 +257,20 @@ def _main():
             seconds,
         )
 
-    if 13 in args.steps:
+    if 12 in args.steps:
         print(f"\n{bcolors.HEADER}Splitting dataset into train, test and validation datasets{bcolors.ENDC}")
         split_dataset(
             root_path,
             f"{metadata_file}_{seconds}s.csv",
-            validation_split=0.2,
-            test_split=0.1
+            validation_split=metadata_val_split,
+            test_split=metadata_test_split
+        )
+
+    if 13 in args.steps:
+        print(f"\n{bcolors.HEADER}Generating the balanced metadata version{bcolors.ENDC}")
+        generate_balanced_metadata(
+            f"{metadata_file}_{seconds}s_train.csv",
+            root_path,
         )
 
 
