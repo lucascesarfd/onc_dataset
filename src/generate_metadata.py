@@ -5,7 +5,8 @@ from tqdm import tqdm
 from pydub.utils import mediainfo
 from utils import read_data_frame_from_feather_file, get_min_max_normalization, get_min_max_values_from_df
 
-CLASSES = ["passengership", "tug", "tanker", "cargo", "other", "background"]
+#CLASSES = ["passengership", "tug", "tanker", "cargo", "other", "background"]
+CLASSES = ["passengership", "tug", "tanker", "cargo", "background"]
 
 def get_class_from_code(code):
     if code == 0:
@@ -68,7 +69,7 @@ def generate_full_metadata(root_path, clean_ctd_directory, interval_ais_dir, inc
         begin_time = row["begin"].replace("-","").replace(":","")
         end_time = row["end"].replace("-","").replace(":","")
 
-        interval_file = os.path.join(interval_ais_dir, f"{begin_time}_{end_time}_interval_data.feather")    
+        interval_file = os.path.join(interval_ais_dir, f"{begin_time}_{end_time}_interval_data.feather")
         metadata_file = read_data_frame_from_feather_file(interval_file)
 
         class_code = metadata_file[metadata_file["distance_to_hydrophone"] <= inclusion_radius].type_and_cargo.unique()[0]
@@ -236,8 +237,12 @@ def split_dataset(root_path, metadata_file, validation_split=0.2, test_split=0.1
     metadata = pd.read_csv(os.path.join(root_path, metadata_file))
     metadata = metadata.sample(frac=1, random_state=random_seed).reset_index(drop=True)
 
+    meta_dict = {label:metadata[metadata["label"] == label].count()[0] for label in CLASSES}
+    smaller_class = min(meta_dict, key=meta_dict.get)
+
     # Creating data indices for training and validation splits:
-    dataset_size = len(metadata.index)
+    #dataset_size = len(metadata.index)
+    dataset_size = meta_dict[smaller_class]*len(CLASSES)
     test_idx = int(np.floor(test_split * dataset_size))
     validation_idx = test_idx + int(np.floor(validation_split * dataset_size))
 
@@ -258,28 +263,27 @@ def main():
     # 1 - Generate the metadata for the full dataset.
     print(f"Generate the metadata for the full dataset")
     inclusion_radius = 4000
-    root_path = "/workspaces/underwater/dataset/07_classified_wav_files/inclusion_4000_exclusion_6000"
+    root_path = "/workspaces/underwater/dataset/07_classified_wav_files/inclusion_4000_exclusion_6000/metadata/filtered/"
     interval_ais_dir = "/workspaces/underwater/dataset/06b_interval_ais_data/"
     clean_ctd_directory = "/workspaces/underwater/dataset/09_cleaned_ctd_files"
-    generate_full_metadata(root_path, clean_ctd_directory, interval_ais_dir, inclusion_radius)
+    #generate_full_metadata(root_path, clean_ctd_directory, interval_ais_dir, inclusion_radius)
 
     # 2 - Split dataset into small periods of time.
     print(f"Split dataset into small periods of time")
-    seconds = 10
+    seconds = 1
     metadata_file = os.path.join(root_path, f"metadata.csv")
-    get_metadata_for_small_times(root_path, metadata_file, seconds)
+    #get_metadata_for_small_times(root_path, metadata_file, seconds)
 
     # 3 - Split the original data into train, test and validation datasets.
     print(f"Split dataset into train, test and validation datasets")
     validation_split = 0.2
     test_split = 0.1
-    metadata_file_sec = os.path.join(root_path, f"metadata_{seconds}s.csv")
+    metadata_file_sec = os.path.join(root_path, f"filtered_metadata_{seconds}s.csv")
     split_dataset(root_path, metadata_file_sec, validation_split=validation_split, test_split=test_split)
 
     # 4 - Generate balanced versions of the metatdata.
     print(f"Generate balanced versions of the metatdata")
-    root_path = "/workspaces/underwater/dataset/07_classified_wav_files/inclusion_4000_exclusion_6000"
-    generate_balanced_metadata(f"metadata.csv", root_path)
+    generate_balanced_metadata(f"filtered_metadata_{seconds}s_train.csv", root_path)
 
 
 
