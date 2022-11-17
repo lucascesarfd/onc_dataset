@@ -5,6 +5,8 @@ from tqdm import tqdm
 from pydub.utils import mediainfo
 from utils import read_data_frame_from_feather_file, get_min_max_normalization, get_min_max_values_from_df
 
+#CLASSES = ["passengership", "tug", "tanker", "cargo", "other", "background"]
+CLASSES = ["passengership", "tug", "tanker", "cargo", "background"]
 
 def get_class_from_code(code):
     if code == 0:
@@ -67,7 +69,7 @@ def generate_full_metadata(root_path, clean_ctd_directory, interval_ais_dir, inc
         begin_time = row["begin"].replace("-","").replace(":","")
         end_time = row["end"].replace("-","").replace(":","")
 
-        interval_file = os.path.join(interval_ais_dir, f"{begin_time}_{end_time}_interval_data.feather")    
+        interval_file = os.path.join(interval_ais_dir, f"{begin_time}_{end_time}_interval_data.feather")
         metadata_file = read_data_frame_from_feather_file(interval_file)
 
         class_code = metadata_file[metadata_file["distance_to_hydrophone"] <= inclusion_radius].type_and_cargo.unique()[0]
@@ -145,14 +147,46 @@ def generate_full_metadata(root_path, clean_ctd_directory, interval_ais_dir, inc
     final_metadata.to_csv(os.path.join(root_path, "metadata.csv"), index=False)
 
 
-def generate_balanced_metadata(metadata_file, root_path):
-    classes = ["other", "passengership", "tug", "tanker", "cargo"]
-
+def generate_oversampled_metadata(metadata_file, root_path, inbalance_limit=2):
     meta = pd.read_csv(os.path.join(root_path, metadata_file))
-    meta_dict = {label:meta[meta["label"] == label]["duration_sec"].sum() for label in classes}
+    meta_dict = {label:meta[meta["label"] == label]["duration_sec"].sum() for label in CLASSES}
+
+    bigger_class = max(meta_dict, key=meta_dict.get)
+    smaller_class = min(meta_dict, key=meta_dict.get)
+
+    relation = min(inbalance_limit, meta_dict[bigger_class]/meta_dict[smaller_class])
+
+    final_size = meta_dict[smaller_class] * relation
+    classes_df = []
+
+    for label in CLASSES:
+        sub_metadata = meta[meta["label"] == label].sample(frac=1, random_state=42).reset_index(drop=True)
+        current_size = 0
+        max_row_num = len(sub_metadata.index)
+        row_num = 0
+        rows = []
+        while current_size < final_size:
+            current_size += sub_metadata.iloc[row_num]["duration_sec"]
+            rows.append(row_num)
+            
+            row_num += 1
+            if row_num == max_row_num:
+                classes_df.append(sub_metadata[sub_metadata.index.isin(rows)])
+                row_num = 0
+                rows = []
+        classes_df.append(sub_metadata[sub_metadata.index.isin(rows)])
+
+    file_name = metadata_file.split(".")[0]
+    balanced_set = pd.concat(classes_df, ignore_index=True)
+    balanced_set.sample(frac=1, random_state=42).reset_index(drop=True).to_csv(os.path.join(root_path, f"{file_name}_oversampled.csv"), index=False)
+
+
+def generate_undersampled_metadata(metadata_file, root_path):
+    meta = pd.read_csv(os.path.join(root_path, metadata_file))
+    meta_dict = {label:meta[meta["label"] == label]["duration_sec"].sum() for label in CLASSES}
     min_time_label = min(meta_dict, key=meta_dict.get)
     idx_dict = {}
-    for label in classes:
+    for label in CLASSES:
         base_time = meta_dict[min_time_label]
         idx_dict[label] = []
         for idx, row in meta[meta["label"] == label].iterrows():
@@ -162,32 +196,53 @@ def generate_balanced_metadata(metadata_file, root_path):
                 break
     idx_list = [idx for _, sublist in idx_dict.items() for idx in sublist]
     file_name = metadata_file.split(".")[0]
-    meta[meta.index.isin(idx_list)].to_csv(os.path.join(root_path, f"{file_name}_balanced.csv"), index=False)
+    meta[meta.index.isin(idx_list)].to_csv(os.path.join(root_path, f"{file_name}_undersampled.csv"), index=False)
+
+
+def generate_balanced_metadata(metadata_file, root_path):
+    generate_oversampled_metadata(metadata_file, root_path)
+    generate_undersampled_metadata(metadata_file, root_path)
 
 
 def get_metadata_for_small_times(root_path, metadata_file, seconds):
     initial_meta = pd.read_csv(os.path.join(root_path, metadata_file))
-    colunas = list(initial_meta.columns) + ['sub_init']
-    meta = pd.DataFrame([], columns=colunas)
+    desired_classes = CLASSES.copy()
+    desired_classes.remove("other")
+    desired_classes.remove("background")
+    duration = []
+    for label in desired_classes:
+        time = initial_meta[initial_meta["label"] == label]["duration_sec"].sum()
+        duration.append(time)
+    
+    max_duration = max(duration)
 
-    size = 0
+    col = list(initial_meta.columns) + ['sub_init']
+    class_duration = {key:0 for key in CLASSES}
+    metadata = []
     for index, row in tqdm(initial_meta.iterrows(), total=initial_meta.shape[0]):
         duration = int(row.duration_sec)
-        step = seconds
-        for i in range(0, duration, step):
-            meta.loc[size] = list(row) + [i]
-            size += 1 
+        row["duration_sec"] = float(seconds)
+        if class_duration[row.label] > max_duration:
+            continue
+        class_duration[row.label] += duration
+        for i in range(0, duration, seconds):
+            metadata.append(list(row) + [i])
 
+    metadata_pd = pd.DataFrame(metadata, columns=col)
     file_name = metadata_file.split(".")[0]
-    meta.to_csv(os.path.join(root_path, f"{file_name}_{seconds}s.csv"), index=False)
+    metadata_pd.to_csv(os.path.join(root_path, f"{file_name}_{seconds}s.csv"), index=False)
 
 
 def split_dataset(root_path, metadata_file, validation_split=0.2, test_split=0.1, random_seed=42):
     metadata = pd.read_csv(os.path.join(root_path, metadata_file))
     metadata = metadata.sample(frac=1, random_state=random_seed).reset_index(drop=True)
 
+    meta_dict = {label:metadata[metadata["label"] == label].count()[0] for label in CLASSES}
+    smaller_class = min(meta_dict, key=meta_dict.get)
+
     # Creating data indices for training and validation splits:
-    dataset_size = len(metadata.index)
+    #dataset_size = len(metadata.index)
+    dataset_size = meta_dict[smaller_class]*len(CLASSES)
     test_idx = int(np.floor(test_split * dataset_size))
     validation_idx = test_idx + int(np.floor(validation_split * dataset_size))
 
@@ -207,24 +262,29 @@ def main():
 
     # 1 - Generate the metadata for the full dataset.
     print(f"Generate the metadata for the full dataset")
-    inclusion_radius = 3000
-    root_path = "/workspaces/underwater/dataset/07_classified_wav_files/inclusion_3000_exclusion_5000"
+    inclusion_radius = 4000
+    root_path = "/workspaces/underwater/dataset/07_classified_wav_files/inclusion_4000_exclusion_6000/metadata/filtered/"
     interval_ais_dir = "/workspaces/underwater/dataset/06b_interval_ais_data/"
     clean_ctd_directory = "/workspaces/underwater/dataset/09_cleaned_ctd_files"
-    generate_full_metadata(root_path, clean_ctd_directory, interval_ais_dir, inclusion_radius)
+    #generate_full_metadata(root_path, clean_ctd_directory, interval_ais_dir, inclusion_radius)
 
     # 2 - Split dataset into small periods of time.
     print(f"Split dataset into small periods of time")
-    seconds = 10
+    seconds = 1
     metadata_file = os.path.join(root_path, f"metadata.csv")
-    get_metadata_for_small_times(root_path, metadata_file, seconds)
+    #get_metadata_for_small_times(root_path, metadata_file, seconds)
 
     # 3 - Split the original data into train, test and validation datasets.
     print(f"Split dataset into train, test and validation datasets")
     validation_split = 0.2
     test_split = 0.1
-    metadata_file_sec = os.path.join(root_path, f"metadata_{seconds}s.csv")
+    metadata_file_sec = os.path.join(root_path, f"filtered_metadata_{seconds}s.csv")
     split_dataset(root_path, metadata_file_sec, validation_split=validation_split, test_split=test_split)
+
+    # 4 - Generate balanced versions of the metatdata.
+    print(f"Generate balanced versions of the metatdata")
+    generate_balanced_metadata(f"filtered_metadata_{seconds}s_train.csv", root_path)
+
 
 
 if __name__ == "__main__":

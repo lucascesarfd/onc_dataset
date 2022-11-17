@@ -184,7 +184,7 @@ def clean_ais_data(
     '''
     This function produces the feather files from the JSON inputed files
     according some restrictions. The new feather file will contain only
-    data there is within te inclusion radius and that have positional data.
+    data there is within the inclusion radius and that have positional data.
     '''
 
     # Threading differences between systems.
