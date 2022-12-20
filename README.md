@@ -133,3 +133,9 @@ A complete literature review containing the background knowledge of this work is
   pages={2181}
 }
 ```
+
+## Acknowledgements
+
+This code, as well as the pipeline formulation and the code used as the basis, was developed in collaboration with [Philliip Skelton](phillip.skelton@flinders.edu.au). 
+
+Thanks to [Paulo Santos](paulo.santos@flinders.edu.au) for the guidance and participation in this project.
