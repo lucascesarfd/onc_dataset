@@ -93,18 +93,21 @@ def clean_ctd_file_into_feather(raw_ctd_directory, file, clean_ctd_directory):
     final_dict["sv"] = []
 
     for line in ctd:
-        date_and_xml = line.split('<?xml')
-        if len(date_and_xml) != 2:
-            continue
-        xml = f'<?xml{date_and_xml[1]}'
-        xml_dict = xmltodict.parse(xml)
+        try:
+            date_and_xml = line.split('<?xml')
+            if len(date_and_xml) != 2:
+                continue
+            xml = f'<?xml{date_and_xml[1]}'
+            xml_dict = xmltodict.parse(xml)
 
-        final_dict["date"].append(date_and_xml[0].strip())
-        final_dict["t1"].append(xml_dict["datapacket"]["data"]["t1"])
-        final_dict["c1"].append(xml_dict["datapacket"]["data"]["c1"])
-        final_dict["p1"].append(xml_dict["datapacket"]["data"]["p1"])
-        final_dict["sal"].append(xml_dict["datapacket"]["data"]["sal"])
-        final_dict["sv"].append(xml_dict["datapacket"]["data"]["sv"])
+            final_dict["date"].append(date_and_xml[0].strip())
+            final_dict["t1"].append(xml_dict["datapacket"]["data"]["t1"])
+            final_dict["c1"].append(xml_dict["datapacket"]["data"]["c1"])
+            final_dict["p1"].append(xml_dict["datapacket"]["data"]["p1"])
+            final_dict["sal"].append(xml_dict["datapacket"]["data"]["sal"])
+            final_dict["sv"].append(xml_dict["datapacket"]["data"]["sv"])
+        except Exception as e:
+            print(f"Could not clean line from file {file_dir}")
 
     final_df = pd.DataFrame.from_dict(final_dict)
 
@@ -138,9 +141,7 @@ def clean_for_chunk(
 
     # Propagate the 'type_and_cargo' messages throughout the MMSI's.
     data_frame = data_frame.sort_values(by=["mmsi", "type_and_cargo"])
-    data_frame["type_and_cargo"] = data_frame.groupby("mmsi")["type_and_cargo"].fillna(
-        method="ffill"
-    )
+    data_frame["type_and_cargo"] = data_frame.groupby("mmsi")["type_and_cargo"].ffill()
 
     # Drop messages where there are no positional coordinates.
     data_frame = data_frame[data_frame.x.notna() & data_frame.y.notna()]
@@ -165,7 +166,7 @@ def clean_for_chunk(
 
     # Create a new column that is the Pandas Timestamp.
     # Some things require AIS, some things require Pandas; annoying.
-    data_frame["pd_timestamp"] = pd.to_datetime(data_frame["ais_timestamp"])
+    data_frame["pd_timestamp"] = pd.to_datetime(data_frame["ais_timestamp"], format='%Y%m%dT%H%M%S.%f'+'Z')
 
     # Out it goes.
     feather_file = os.path.join(
@@ -329,8 +330,6 @@ def clean_ctd_data(
             deployment_end = pd.Timestamp(deployment.end).normalize() + pd.DateOffset(
                 days=1
             )
-
-            #deployment_ctd_data_files = []
 
             for file in tqdm(files_to_clean):
                 file_timestamp = pd.Timestamp(file.split("_")[1].split(".")[0], tz='UTC')

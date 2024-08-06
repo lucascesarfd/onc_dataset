@@ -3,7 +3,7 @@ import os
 
 from config import *
 from utils import bcolors, create_dir, get_exclusion_radius
-from download import query_onc_deployments, download_files
+from download import query_onc_deployments, download_files, download_needed_wav
 from parse import parse_ais_to_json
 from clean import clean_ais_data, clean_ctd_data
 from combine import combine_deployment_ais_data
@@ -120,13 +120,13 @@ def _main():
 
     deployment_directory = create_dir(working_directory, "00_hydrophone_deployments")
     raw_ais_directory = create_dir(working_directory, "01_raw_ais_files")
-    raw_wav_directory = create_dir(working_directory, "02_raw_wav_files")
     parsed_ais_directory = create_dir(working_directory, "03_parsed_ais_files")
     clean_ais_directory = create_dir(working_directory, "04_clean_and_inrange_ais_data")
     combined_deployment_directory = create_dir(working_directory, "05_combined_deployment_ais_data")
     scenario_intervals_directory = create_dir(working_directory, "06a_scenario_intervals")
     interval_ais_data_directory = create_dir(working_directory, "06b_interval_ais_data")
-    classified_wav_directory = create_dir(working_directory, "07_classified_wav_files")
+    needed_wav_directory = create_dir(working_directory, "07a_needed_wav_files")
+    classified_wav_directory = create_dir(working_directory, "07b_classified_wav_files")
     raw_ctd_directory = create_dir(working_directory, "08_raw_ctd_files")
     clean_ctd_directory = create_dir(working_directory, "09_cleaned_ctd_files")
 
@@ -163,20 +163,14 @@ def _main():
         )
 
     if 2 in args.steps:
-        print(f"\n{bcolors.HEADER}Downloading Raw WAV Files{bcolors.ENDC}")
-        download_files(
-            raw_wav_directory,
-            deployment_directory,
-            token,
-            file_type="WAV",
-        )
+        print(f"\n{bcolors.HEADER}Deprecated: the download is part of step 7 now.{bcolors.ENDC}")
 
     if 3 in args.steps:
         print(f"\n{bcolors.HEADER}Parsing AIS files to JSON files{bcolors.ENDC}")
         parse_ais_to_json(
             raw_ais_directory,
             parsed_ais_directory,
-            single_threaded_processing=True,
+            single_threaded_processing=False,
         )
 
     if 4 in args.steps:
@@ -213,12 +207,20 @@ def _main():
         )
 
     if 7 in args.steps:
-        print(f"\n{bcolors.HEADER}Classifying the dataset into the chosen range{bcolors.ENDC}")
+        print(f"\n{bcolors.HEADER}Downloading files from the chosen range{bcolors.ENDC}")
+        download_needed_wav(
+            needed_wav_directory,
+            deployment_directory,
+            scenario_intervals_directory,
+            inclusion_radius,
+            token,
+        )
+        print(f"\n{bcolors.HEADER}Grouping files from the chosen range{bcolors.ENDC}")
         group_wav_from_range(
             classified_wav_directory,
             scenario_intervals_directory,
             interval_ais_data_directory,
-            raw_wav_directory,
+            needed_wav_directory,
             inclusion_radius,
         )
 

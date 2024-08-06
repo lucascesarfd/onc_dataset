@@ -21,13 +21,13 @@ def generate_time_steps(_row_pd_timestamp, _row_time_difference, _minimum_delta)
     end_timestamp = _row_pd_timestamp
     time_difference = _row_time_difference
 
-    steps_required = np.ceil(time_difference / _minimum_delta)
+    steps_required = np.ceil(time_difference / _minimum_delta).astype('int')
 
     time_steps = pd.date_range(
         start=(end_timestamp - time_difference),
         end=end_timestamp - (time_difference / steps_required),
         periods=steps_required,
-        closed="right",
+        inclusive="right",
     )
 
     return time_steps.to_list()
@@ -74,9 +74,9 @@ def interpolation_for_chunks(_chunk):
             "distance_to_hydrophone"
         ].interpolate()
 
-        _chunk["id"] = _chunk["id"].fillna(method="ffill")
-        _chunk["mmsi"] = _chunk["mmsi"].fillna(method="ffill")
-        _chunk["type_and_cargo"] = _chunk["type_and_cargo"].fillna(method="ffill")
+        _chunk["id"] = _chunk["id"].ffill()
+        _chunk["mmsi"] = _chunk["mmsi"].ffill()
+        _chunk["type_and_cargo"] = _chunk["type_and_cargo"].ffill()
 
         return _chunk[_chunk["ais_timestamp"].isna()]
 
@@ -187,7 +187,7 @@ def combine_deployment_ais_data(
             print("Populating pd_timestamp column...")
 
             start_time = time.time()
-            data_frame["pd_timestamp"] = pd.to_datetime(data_frame["ais_timestamp"])
+            data_frame["pd_timestamp"] = pd.to_datetime(data_frame["ais_timestamp"], format='%Y%m%dT%H%M%S.%f'+'Z')
             data_frame.sort_values(by="pd_timestamp", inplace=True, ignore_index=True)
             data_frame.reset_index(inplace=True, drop=True)
 

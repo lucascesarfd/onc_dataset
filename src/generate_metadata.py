@@ -9,9 +9,13 @@ from utils import read_data_frame_from_feather_file, get_min_max_normalization, 
 CLASSES = ["passengership", "tug", "tanker", "cargo", "background"]
 
 def get_class_from_code(code):
+    """Codes were extracted from these sources:
+    https://api.vtexplorer.com/docs/ref-aistypes.html
+    https://documentation.spire.com/ais-fundamentals/ship-type-mappings/
+    """
     if code == 0:
         return "background"
-    elif code == 52:
+    elif code == 52 or code == 31 or code == 32:
         return "tug"
     elif code >= 60 and code <= 69:
         return "passengership"
@@ -74,33 +78,36 @@ def generate_full_metadata(root_path, clean_ctd_directory, interval_ais_dir, inc
 
         class_code = metadata_file[metadata_file["distance_to_hydrophone"] <= inclusion_radius].type_and_cargo.unique()[0]
         mmsi = metadata_file[metadata_file["distance_to_hydrophone"] <= inclusion_radius].mmsi.unique()[0]
-        path = os.path.join(dir_vessel, f'{row["wav_file"]}.wav')
+        file_name = f'{row["wav_file"]}.wav'
+        path = os.path.join(dir_vessel, file_name)
         info = mediainfo(path)
 
         t1, c1, p1, sal, sv = get_mean_ctd_from_range(ctd_df, begin_time, end_time)
 
         # Append AIS data
-        metadata["class_code"].append(class_code)
         metadata["MMSI"].append(mmsi)
-        metadata["path"].append(path)
-        metadata["date"].append(row["begin"].replace("-","").split("T")[0])
+        metadata["class_code"].append(class_code)
+        metadata["label"].append(get_class_from_code(class_code))
+
+        # Append audio data
+        metadata["path"].append(f"./vessel/{file_name}")
         metadata["duration_sec"].append(info["duration"])
         metadata["sample_rate"].append(info["sample_rate"])
-        metadata["label"].append(get_class_from_code(class_code))
+        metadata["date"].append(row["begin"].replace("-","").split("T")[0])
 
         # Append CTD data
         metadata["t1"].append(t1)
         metadata["c1"].append(c1)
         metadata["p1"].append(p1)
-        metadata["sal"].append(sal)
         metadata["sv"].append(sv)
+        metadata["sal"].append(sal)
 
         # Append normalized CTD data
         metadata["t1_norm"].append(get_min_max_normalization(t1, min_max_ctd["t1"][0], min_max_ctd["t1"][1]))
         metadata["c1_norm"].append(get_min_max_normalization(c1, min_max_ctd["c1"][0], min_max_ctd["c1"][1]))
         metadata["p1_norm"].append(get_min_max_normalization(p1, min_max_ctd["p1"][0], min_max_ctd["p1"][1]))
-        metadata["sal_norm"].append(get_min_max_normalization(sal, min_max_ctd["sal"][0], min_max_ctd["sal"][1]))
         metadata["sv_norm"].append(get_min_max_normalization(sv, min_max_ctd["sv"][0], min_max_ctd["sv"][1]))
+        metadata["sal_norm"].append(get_min_max_normalization(sal, min_max_ctd["sal"][0], min_max_ctd["sal"][1]))
 
     dir_background = os.path.join(root_path, "background")
     meta_backgorund = os.path.join(dir_background, "intervals.csv")
@@ -114,34 +121,37 @@ def generate_full_metadata(root_path, clean_ctd_directory, interval_ais_dir, inc
         interval_file = os.path.join(interval_ais_dir, f"{begin_time}_{end_time}_interval_data.feather")    
         metadata_file = read_data_frame_from_feather_file(interval_file)
 
-        path = os.path.join(dir_background, f'{row["wav_file"]}.wav')
+        file_name = f'{row["wav_file"]}.wav'
+        path = os.path.join(dir_background, file_name)
         info = mediainfo(path)
 
         t1, c1, p1, sal, sv = get_mean_ctd_from_range(ctd_df, begin_time, end_time)
 
         # Append AIS data
         class_code = 0
-        metadata["class_code"].append(class_code)
         metadata["MMSI"].append(0)
-        metadata["path"].append(path)
-        metadata["date"].append(row["begin"].replace("-","").split("T")[0])
+        metadata["class_code"].append(class_code)
+        metadata["label"].append(get_class_from_code(class_code))
+        
+        # Append audio data
+        metadata["path"].append(f"./background/{file_name}")
         metadata["duration_sec"].append(info["duration"])
         metadata["sample_rate"].append(info["sample_rate"])
-        metadata["label"].append(get_class_from_code(class_code))
+        metadata["date"].append(row["begin"].replace("-","").split("T")[0])
 
         # Append CTD data
         metadata["t1"].append(t1)
         metadata["c1"].append(c1)
         metadata["p1"].append(p1)
-        metadata["sal"].append(sal)
         metadata["sv"].append(sv)
+        metadata["sal"].append(sal)
 
         # Append normalized CTD data
         metadata["t1_norm"].append(get_min_max_normalization(t1, min_max_ctd["t1"][0], min_max_ctd["t1"][1]))
         metadata["c1_norm"].append(get_min_max_normalization(c1, min_max_ctd["c1"][0], min_max_ctd["c1"][1]))
         metadata["p1_norm"].append(get_min_max_normalization(p1, min_max_ctd["p1"][0], min_max_ctd["p1"][1]))
-        metadata["sal_norm"].append(get_min_max_normalization(sal, min_max_ctd["sal"][0], min_max_ctd["sal"][1]))
         metadata["sv_norm"].append(get_min_max_normalization(sv, min_max_ctd["sv"][0], min_max_ctd["sv"][1]))
+        metadata["sal_norm"].append(get_min_max_normalization(sal, min_max_ctd["sal"][0], min_max_ctd["sal"][1]))
 
     final_metadata = pd.DataFrame.from_dict(metadata)
     final_metadata.to_csv(os.path.join(root_path, "metadata.csv"), index=False)

@@ -168,7 +168,7 @@ def parse_all_valid_messages(
 
             # Is the message ID one that we care about?
 
-            # Taken from https://www.navcen.uscg.gov/?pageName=AISMessages
+            # Taken from https://www.navcen.uscg.gov/ais-messages
             # 1 = Position report (Class A)
             # 2 = Position report (Class A)
             # 3 = Position report (Class A)
@@ -261,7 +261,7 @@ def parse_ais_to_json(
     else:
         print("Begin Multi threading processing...")
         start_time = time.time()
-        thread_pool = multiprocessing.Pool(2)
+        thread_pool = multiprocessing.Pool(5)
         arguments = partial(
             parse_all_valid_messages,
             _raw_data_directory=raw_ais_directory,
