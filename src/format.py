@@ -83,6 +83,7 @@ def split_and_save_wav(raw_wav_directory, output_save_dir, data_from_range, wav_
                 )
         except:
             print(f"Error while exporting {file_idx} audio segment")
+            continue
 
     interval_csv_file = open(os.path.join(output_save_dir, "intervals.csv"), "w")
     interval_csv_file.write("begin,end,wav_file\n")

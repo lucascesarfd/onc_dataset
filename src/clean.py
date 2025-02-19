@@ -137,11 +137,21 @@ def clean_for_chunk(
     json_file = os.path.join(
         _parsed_ais_files_directory, _file.replace(".txt", "_parsed.json")
     )
-    data_frame = pd.DataFrame(read_messages_from_json_file(json_file))
+    msgs = read_messages_from_json_file(json_file)
 
-    # Propagate the 'type_and_cargo' messages throughout the MMSI's.
-    data_frame = data_frame.sort_values(by=["mmsi", "type_and_cargo"])
-    data_frame["type_and_cargo"] = data_frame.groupby("mmsi")["type_and_cargo"].ffill()
+    # If there are no messages, there is nothing to clean.
+    if len(msgs) == 0:
+        return
+    data_frame = pd.DataFrame(msgs)
+
+
+    # Propagate the 'type_and_cargo' and dimensions throughout the MMSI's.
+    if "type_and_cargo" not in data_frame.columns:
+        return
+
+    for m in ["type_and_cargo", "dim_a", "dim_b", "dim_c", "dim_d"]:
+        data_frame = data_frame.sort_values(by=["mmsi", m])
+        data_frame[m] = data_frame.groupby("mmsi")[m].ffill()
 
     # Drop messages where there are no positional coordinates.
     data_frame = data_frame[data_frame.x.notna() & data_frame.y.notna()]

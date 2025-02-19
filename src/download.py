@@ -12,6 +12,7 @@ from functools import partial
 
 from utils import bcolors
 from format import find_in_range_wav
+from config import AIS_CODE, WAV_DEVICES, CTD_DEVICE
 
 
 def get_deployment_filters(deployment_directory, filter_type="WAV"):
@@ -34,7 +35,7 @@ def get_deployment_filters(deployment_directory, filter_type="WAV"):
             elif filter_type.lower() == "ais":
                 filters.append(
                     {
-                        "deviceCode": "DIGITALYACHTAISNET1302-0097-01",
+                        "deviceCode": AIS_CODE,
                         "dateFrom": row["begin"],
                         "dateTo": row["end"],
                         "extension": "txt",
@@ -43,7 +44,7 @@ def get_deployment_filters(deployment_directory, filter_type="WAV"):
             elif filter_type.lower() == "ctd":
                 filters.append(
                     {
-                        "deviceCode": "SBECTD19p6935",
+                        "deviceCode": CTD_DEVICE,
                         "dateFrom": row["begin"],
                         "dateTo": row["end"],
                         "extension": "txt",
@@ -79,7 +80,7 @@ def query_onc_deployments(deployment_directory, token):
     onc_api = ONC(token, outPath=deployment_directory, timeout=600)
 
     # Find the deployment windows for the hydrophones.
-    filters = [{"deviceCode": "ICLISTENAF2523"}, {"deviceCode": "ICLISTENAF2556"}]
+    filters = WAV_DEVICES
     results = []
 
     for new_filter in filters:

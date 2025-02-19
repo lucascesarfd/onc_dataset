@@ -70,6 +70,12 @@ def _get_parameters_from_message(_message, _parameters):
                     else np.nan
                 )
 
+            elif parameter == ais_params.DIM_A or parameter == ais_params.DIM_B:
+                value = _message[parameter]
+
+            elif parameter == ais_params.DIM_C or parameter == ais_params.DIM_D:
+                value = _message[parameter]
+
         except KeyError as e:
             print(f"{bcolors.FAIL}{_message}{bcolors.ENDC}")
             raise KeyError(e)
@@ -192,7 +198,7 @@ def parse_all_valid_messages(
             # Message ID's 1, 2, and 3 all seem to be the same information for Class A vessels.
             # Message ID 18 is for Class B vessels, but we want the same information from that message ID.
             if message["id"] in (1, 2, 3, 18):
-                parameters = ("x", "y", "sog", "cog", "true_heading")
+                parameters = (ais_params.X, ais_params.Y, ais_params.SOG, ais_params.COG, ais_params.TRUE_HEADING)
 
             # Message ID 5 is for Class A vessel information.
             # Message ID 24 is for Class B vessel information and comes in 2 parts.
@@ -200,11 +206,20 @@ def parse_all_valid_messages(
             elif (message["id"] == 5) or (
                 message["id"] == 24 and message["part_num"] == 1
             ):
-                parameters = ("type_and_cargo",)
+                #parameters = (ais_params.TYPE_AND_CARGO,)
+                parameters = (
+                    ais_params.TYPE_AND_CARGO, ais_params.DIM_A, ais_params.DIM_B, ais_params.DIM_C, ais_params.DIM_D
+                )
 
             # Message ID 19 is essentially an ID 1, 2, 3, or 18 message with additional fields from ID 5.
             elif message["id"] == 19:
-                parameters = ("x", "y", "sog", "cog", "true_heading", "type_and_cargo")
+                #parameters = (
+                #    ais_params.X, ais_params.Y, ais_params.SOG, ais_params.COG, ais_params.TRUE_HEADING, ais_params.TYPE_AND_CARGO
+                #)
+                parameters = (
+                    ais_params.X, ais_params.Y, ais_params.SOG, ais_params.COG, ais_params.TRUE_HEADING,
+                    ais_params.TYPE_AND_CARGO, ais_params.DIM_A, ais_params.DIM_B, ais_params.DIM_C, ais_params.DIM_D
+                )
 
             responses = _get_parameters_from_message(message, parameters)
 

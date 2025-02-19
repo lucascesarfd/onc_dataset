@@ -44,11 +44,11 @@ def create_parser():
         "By default, all stages are executed."
         "0 - Query ONC deployments; "
         "1 - Download AIS files; "
-        "2 - Download WAV files; "
-        "3 - Parse AIS to JSON; "
-        "4 - Clean AIS data; "
-        "5 - Combine deployment AIS data; "
-        "6 - Identify scenarios; "
+        "2 - Parse AIS to JSON; "
+        "3 - Clean AIS data; "
+        "4 - Combine deployment AIS data; "
+        "5 - Identify scenarios; "
+        "6 - Download WAV files; "
         "7 - Classify WAV files from range; "
         "8 - Download CTD files; "
         "9 - Clean CTD files; "
@@ -83,6 +83,14 @@ def create_parser():
     )
 
     parser.add_argument(
+        "--use_ctd",
+        "-c",
+        type=int,
+        default=USE_CTD,
+        help="Define if the metadata will include ctd information.",
+    )
+
+    parser.add_argument(
         "--metadata_file",
         "-f",
         type=str,
@@ -110,7 +118,6 @@ def create_parser():
 
 
 def _main():
-    # Execute the parse_args() method
     parser = create_parser()
     args = parser.parse_args()
 
@@ -163,9 +170,6 @@ def _main():
         )
 
     if 2 in args.steps:
-        print(f"\n{bcolors.HEADER}Deprecated: the download is part of step 7 now.{bcolors.ENDC}")
-
-    if 3 in args.steps:
         print(f"\n{bcolors.HEADER}Parsing AIS files to JSON files{bcolors.ENDC}")
         parse_ais_to_json(
             raw_ais_directory,
@@ -173,7 +177,7 @@ def _main():
             single_threaded_processing=False,
         )
 
-    if 4 in args.steps:
+    if 3 in args.steps:
         print(f"\n{bcolors.HEADER}Cleaning AIS data{bcolors.ENDC}")
         clean_ais_data(
             deployment_directory,
@@ -183,7 +187,7 @@ def _main():
             use_all_threads=False,
         )
 
-    if 5 in args.steps:
+    if 4 in args.steps:
         print(f"\n{bcolors.HEADER}Combining Deployment AIS data{bcolors.ENDC}")
         # This will run the shortest hydrophone deployment to speed up development.
         run_shortest = False
@@ -196,7 +200,7 @@ def _main():
             use_all_threads=False,
         )
 
-    if 6 in args.steps:
+    if 5 in args.steps:
         print(f"\n{bcolors.HEADER}Identifying scenarios{bcolors.ENDC}")
         identify_scenarios(
             working_directory,
@@ -206,8 +210,8 @@ def _main():
             combined_deployment_directory,
         )
 
-    if 7 in args.steps:
-        print(f"\n{bcolors.HEADER}Downloading files from the chosen range{bcolors.ENDC}")
+    if 6 in args.steps:
+        print(f"\n{bcolors.HEADER}Downloading WAV files from the chosen scenario{bcolors.ENDC}")
         download_needed_wav(
             needed_wav_directory,
             deployment_directory,
@@ -215,6 +219,8 @@ def _main():
             inclusion_radius,
             token,
         )
+
+    if 7 in args.steps:
         print(f"\n{bcolors.HEADER}Grouping files from the chosen range{bcolors.ENDC}")
         group_wav_from_range(
             classified_wav_directory,
@@ -249,6 +255,7 @@ def _main():
             clean_ctd_directory,
             interval_ais_data_directory,
             inclusion_radius,
+            use_ctd=args.use_ctd
         )
 
     if 11 in args.steps:

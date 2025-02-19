@@ -5,7 +5,7 @@ from tqdm import tqdm
 from pydub.utils import mediainfo
 from utils import read_data_frame_from_feather_file, get_min_max_normalization, get_min_max_values_from_df
 
-#CLASSES = ["passengership", "tug", "tanker", "cargo", "other", "background"]
+# Classes to be included on processed metadata. The original one will contain all the available classes.
 CLASSES = ["passengership", "tug", "tanker", "cargo", "background"]
 
 def get_class_from_code(code):
@@ -23,6 +23,18 @@ def get_class_from_code(code):
         return "cargo"
     elif code >= 80 and code <= 89:
         return "tanker"
+    elif code == 50:
+        return "pilotvessel"
+    elif code == 51:
+        return "rescue"
+    elif code == 36:
+        return "sailing"
+    elif code == 37:
+        return "pleasurecraft"
+    elif code == 30:
+        return "fishing"
+    elif code == 33:
+        return "dredger"
     
     return "other"
 
@@ -53,11 +65,13 @@ def get_full_ctd_dataframe(clean_ctd_directory):
     return df
 
 
-def generate_full_metadata(root_path, clean_ctd_directory, interval_ais_dir, inclusion_radius):
+def generate_full_metadata(root_path, clean_ctd_directory, interval_ais_dir, inclusion_radius, use_ctd=True):
 
     columns = ["label", "duration_sec", "path", "sample_rate", "class_code",
-               "date", "MMSI", "t1", "c1", "p1", "sal", "sv", "t1_norm",
-               "c1_norm", "p1_norm", "sal_norm", "sv_norm"]
+               "date", "MMSI", "length", "width"]
+    if use_ctd:
+        columns.extend(["t1", "c1", "p1", "sal", "sv", "t1_norm",
+               "c1_norm", "p1_norm", "sal_norm", "sv_norm"])
 
     metadata = {key:[] for key in columns}
 
@@ -65,8 +79,9 @@ def generate_full_metadata(root_path, clean_ctd_directory, interval_ais_dir, inc
     meta_vessel = os.path.join(dir_vessel, "intervals.csv")
     df_vessel = pd.read_csv(meta_vessel)
 
-    ctd_df = get_full_ctd_dataframe(clean_ctd_directory)
-    min_max_ctd = get_min_max_values_from_df(ctd_df, ["t1", "c1", "p1", "sal", "sv"])
+    if use_ctd:
+        ctd_df = get_full_ctd_dataframe(clean_ctd_directory)
+        min_max_ctd = get_min_max_values_from_df(ctd_df, ["t1", "c1", "p1", "sal", "sv"])
 
     print(f"Vessel Metafile")
     for _, row in tqdm(df_vessel.iterrows(), total=df_vessel.shape[0]):
@@ -82,12 +97,19 @@ def generate_full_metadata(root_path, clean_ctd_directory, interval_ais_dir, inc
         path = os.path.join(dir_vessel, file_name)
         info = mediainfo(path)
 
-        t1, c1, p1, sal, sv = get_mean_ctd_from_range(ctd_df, begin_time, end_time)
 
         # Append AIS data
         metadata["MMSI"].append(mmsi)
         metadata["class_code"].append(class_code)
         metadata["label"].append(get_class_from_code(class_code))
+        
+        # Append vessel dimension data from AIS
+        dim_a = metadata_file[metadata_file["distance_to_hydrophone"] <= inclusion_radius].dim_a.unique()[0]
+        dim_b = metadata_file[metadata_file["distance_to_hydrophone"] <= inclusion_radius].dim_b.unique()[0]
+        dim_c = metadata_file[metadata_file["distance_to_hydrophone"] <= inclusion_radius].dim_c.unique()[0]
+        dim_d = metadata_file[metadata_file["distance_to_hydrophone"] <= inclusion_radius].dim_d.unique()[0]
+        metadata["length"].append(dim_a+dim_b)
+        metadata["width"].append(dim_c+dim_d)
 
         # Append audio data
         metadata["path"].append(f"./vessel/{file_name}")
@@ -95,19 +117,22 @@ def generate_full_metadata(root_path, clean_ctd_directory, interval_ais_dir, inc
         metadata["sample_rate"].append(info["sample_rate"])
         metadata["date"].append(row["begin"].replace("-","").split("T")[0])
 
-        # Append CTD data
-        metadata["t1"].append(t1)
-        metadata["c1"].append(c1)
-        metadata["p1"].append(p1)
-        metadata["sv"].append(sv)
-        metadata["sal"].append(sal)
+        if use_ctd:
+            t1, c1, p1, sal, sv = get_mean_ctd_from_range(ctd_df, begin_time, end_time)
+            
+            # Append CTD data
+            metadata["t1"].append(t1)
+            metadata["c1"].append(c1)
+            metadata["p1"].append(p1)
+            metadata["sv"].append(sv)
+            metadata["sal"].append(sal)
 
-        # Append normalized CTD data
-        metadata["t1_norm"].append(get_min_max_normalization(t1, min_max_ctd["t1"][0], min_max_ctd["t1"][1]))
-        metadata["c1_norm"].append(get_min_max_normalization(c1, min_max_ctd["c1"][0], min_max_ctd["c1"][1]))
-        metadata["p1_norm"].append(get_min_max_normalization(p1, min_max_ctd["p1"][0], min_max_ctd["p1"][1]))
-        metadata["sv_norm"].append(get_min_max_normalization(sv, min_max_ctd["sv"][0], min_max_ctd["sv"][1]))
-        metadata["sal_norm"].append(get_min_max_normalization(sal, min_max_ctd["sal"][0], min_max_ctd["sal"][1]))
+            # Append normalized CTD data
+            metadata["t1_norm"].append(get_min_max_normalization(t1, min_max_ctd["t1"][0], min_max_ctd["t1"][1]))
+            metadata["c1_norm"].append(get_min_max_normalization(c1, min_max_ctd["c1"][0], min_max_ctd["c1"][1]))
+            metadata["p1_norm"].append(get_min_max_normalization(p1, min_max_ctd["p1"][0], min_max_ctd["p1"][1]))
+            metadata["sv_norm"].append(get_min_max_normalization(sv, min_max_ctd["sv"][0], min_max_ctd["sv"][1]))
+            metadata["sal_norm"].append(get_min_max_normalization(sal, min_max_ctd["sal"][0], min_max_ctd["sal"][1]))
 
     dir_background = os.path.join(root_path, "background")
     meta_backgorund = os.path.join(dir_background, "intervals.csv")
@@ -125,13 +150,14 @@ def generate_full_metadata(root_path, clean_ctd_directory, interval_ais_dir, inc
         path = os.path.join(dir_background, file_name)
         info = mediainfo(path)
 
-        t1, c1, p1, sal, sv = get_mean_ctd_from_range(ctd_df, begin_time, end_time)
 
         # Append AIS data
         class_code = 0
         metadata["MMSI"].append(0)
         metadata["class_code"].append(class_code)
         metadata["label"].append(get_class_from_code(class_code))
+        metadata["length"].append(0)
+        metadata["width"].append(0)
         
         # Append audio data
         metadata["path"].append(f"./background/{file_name}")
@@ -139,19 +165,22 @@ def generate_full_metadata(root_path, clean_ctd_directory, interval_ais_dir, inc
         metadata["sample_rate"].append(info["sample_rate"])
         metadata["date"].append(row["begin"].replace("-","").split("T")[0])
 
-        # Append CTD data
-        metadata["t1"].append(t1)
-        metadata["c1"].append(c1)
-        metadata["p1"].append(p1)
-        metadata["sv"].append(sv)
-        metadata["sal"].append(sal)
+        if use_ctd:
+            t1, c1, p1, sal, sv = get_mean_ctd_from_range(ctd_df, begin_time, end_time)
 
-        # Append normalized CTD data
-        metadata["t1_norm"].append(get_min_max_normalization(t1, min_max_ctd["t1"][0], min_max_ctd["t1"][1]))
-        metadata["c1_norm"].append(get_min_max_normalization(c1, min_max_ctd["c1"][0], min_max_ctd["c1"][1]))
-        metadata["p1_norm"].append(get_min_max_normalization(p1, min_max_ctd["p1"][0], min_max_ctd["p1"][1]))
-        metadata["sv_norm"].append(get_min_max_normalization(sv, min_max_ctd["sv"][0], min_max_ctd["sv"][1]))
-        metadata["sal_norm"].append(get_min_max_normalization(sal, min_max_ctd["sal"][0], min_max_ctd["sal"][1]))
+            # Append CTD data
+            metadata["t1"].append(t1)
+            metadata["c1"].append(c1)
+            metadata["p1"].append(p1)
+            metadata["sv"].append(sv)
+            metadata["sal"].append(sal)
+
+            # Append normalized CTD data
+            metadata["t1_norm"].append(get_min_max_normalization(t1, min_max_ctd["t1"][0], min_max_ctd["t1"][1]))
+            metadata["c1_norm"].append(get_min_max_normalization(c1, min_max_ctd["c1"][0], min_max_ctd["c1"][1]))
+            metadata["p1_norm"].append(get_min_max_normalization(p1, min_max_ctd["p1"][0], min_max_ctd["p1"][1]))
+            metadata["sv_norm"].append(get_min_max_normalization(sv, min_max_ctd["sv"][0], min_max_ctd["sv"][1]))
+            metadata["sal_norm"].append(get_min_max_normalization(sal, min_max_ctd["sal"][0], min_max_ctd["sal"][1]))
 
     final_metadata = pd.DataFrame.from_dict(metadata)
     final_metadata.to_csv(os.path.join(root_path, "metadata.csv"), index=False)

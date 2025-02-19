@@ -77,6 +77,10 @@ def interpolation_for_chunks(_chunk):
         _chunk["id"] = _chunk["id"].ffill()
         _chunk["mmsi"] = _chunk["mmsi"].ffill()
         _chunk["type_and_cargo"] = _chunk["type_and_cargo"].ffill()
+        _chunk["dim_a"] = _chunk["dim_a"].ffill()
+        _chunk["dim_b"] = _chunk["dim_b"].ffill()
+        _chunk["dim_c"] = _chunk["dim_c"].ffill()
+        _chunk["dim_d"] = _chunk["dim_d"].ffill()
 
         return _chunk[_chunk["ais_timestamp"].isna()]
 

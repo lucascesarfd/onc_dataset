@@ -30,6 +30,10 @@ class ais_params:
     TYPE_AND_CARGO = "type_and_cargo"
     FIX_TYPE = "fix_type"
     IMO = "imo"
+    DIM_A = "dim_a"
+    DIM_B = "dim_b"
+    DIM_C = "dim_c"
+    DIM_D = "dim_d"
 
 
 def create_dir(path, dir_name):
