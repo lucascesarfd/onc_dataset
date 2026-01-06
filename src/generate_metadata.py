@@ -68,7 +68,8 @@ def get_full_ctd_dataframe(clean_ctd_directory):
 def generate_full_metadata(root_path, clean_ctd_directory, interval_ais_dir, inclusion_radius, use_ctd=True):
 
     columns = ["label", "duration_sec", "path", "sample_rate", "class_code",
-               "date", "MMSI", "length", "width"]
+               "date", "MMSI", "length", "beam"]
+
     if use_ctd:
         columns.extend(["t1", "c1", "p1", "sal", "sv", "t1_norm",
                "c1_norm", "p1_norm", "sal_norm", "sv_norm"])
@@ -109,7 +110,7 @@ def generate_full_metadata(root_path, clean_ctd_directory, interval_ais_dir, inc
         dim_c = metadata_file[metadata_file["distance_to_hydrophone"] <= inclusion_radius].dim_c.unique()[0]
         dim_d = metadata_file[metadata_file["distance_to_hydrophone"] <= inclusion_radius].dim_d.unique()[0]
         metadata["length"].append(dim_a+dim_b)
-        metadata["width"].append(dim_c+dim_d)
+        metadata["beam"].append(dim_c+dim_d)
 
         # Append audio data
         metadata["path"].append(f"./vessel/{file_name}")
@@ -157,7 +158,7 @@ def generate_full_metadata(root_path, clean_ctd_directory, interval_ais_dir, inc
         metadata["class_code"].append(class_code)
         metadata["label"].append(get_class_from_code(class_code))
         metadata["length"].append(0)
-        metadata["width"].append(0)
+        metadata["beam"].append(0)
         
         # Append audio data
         metadata["path"].append(f"./background/{file_name}")

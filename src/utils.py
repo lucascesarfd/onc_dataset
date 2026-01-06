@@ -100,7 +100,7 @@ def zulu_string_to_datetime(_timestamp):
 
 
 def get_exclusion_radius(inclusion_radius):
-    return inclusion_radius+2000
+    return inclusion_radius + 2000
 
 
 def get_min_max_normalization(input_value, min_value, max_value):

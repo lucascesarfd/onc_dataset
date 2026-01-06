@@ -114,6 +114,14 @@ def create_parser():
         help="The proportion reserved from metadata to the test split"
     )
 
+    parser.add_argument(
+        "--unique",
+        "-uq",
+        type=bool,
+        default=UNIQUE_SCENARIOS,
+        help="If the scenario intervals should be isolated statistically (True) or contain as many recordings as possible (False)"
+    )
+
     return parser
 
 
@@ -142,6 +150,9 @@ def _main():
     # The maximum distance (metres) that a vessel can be from the hydrophone before we start caring about it.
     max_inclusion_radius = args.max_inclusion_radius
     inclusion_radius = args.inclusion_radius
+
+    # If the scenario intervals should be isolated statistically (True) or contain as many recordings as possible (False).
+    unique = args.unique
 
     # The size of each audio sample in metadata.
     seconds = args.seconds
@@ -218,6 +229,7 @@ def _main():
             scenario_intervals_directory,
             inclusion_radius,
             token,
+            unique=unique,
         )
 
     if 7 in args.steps:
@@ -227,7 +239,8 @@ def _main():
             scenario_intervals_directory,
             interval_ais_data_directory,
             needed_wav_directory,
-            inclusion_radius,
+            inclusion_radius,            
+            unique=unique,
         )
 
     if 8 in args.steps:

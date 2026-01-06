@@ -10,7 +10,7 @@ from tqdm import tqdm
 from onc.onc import ONC
 from functools import partial
 
-from utils import bcolors
+from utils import bcolors, get_exclusion_radius
 from format import find_in_range_wav
 from config import AIS_CODE, WAV_DEVICES, CTD_DEVICE
 
@@ -169,9 +169,9 @@ def download_files(output_directory, deployment_directory, token, file_type="WAV
     return
 
 
-def download_needed_wav(output_directory, deployment_directory, scenario_interval_dir, inclusion_radius, token):
+def download_needed_wav(output_directory, deployment_directory, scenario_interval_dir, inclusion_radius, token, unique=True):
     # Define exclusion range as an offset from the inclusion.
-    exclusion_radius = 2000 + inclusion_radius
+    exclusion_radius = get_exclusion_radius(inclusion_radius)
 
     # Instantiate ONC object.
     onc_api = ONC(token, timeout=600)
@@ -192,7 +192,8 @@ def download_needed_wav(output_directory, deployment_directory, scenario_interva
 
     interval_file_names = os.listdir(scenario_interval_dir)
     # Read vessel intervals range data from csv.
-    vessel_interval_file_names = [file for file in interval_file_names if file.lower().endswith('unique_vessel_intervals.csv')]
+    csv_name = 'unique_vessel_intervals.csv' if unique else 'all_vessel_intervals.csv'
+    vessel_interval_file_names = [file for file in interval_file_names if file.lower().endswith(csv_name)]
     vessel_interval_data = pd.read_csv(os.path.join(scenario_interval_dir, vessel_interval_file_names[0]))
 
     # Get data from only the selected inclusion/exclusion range.

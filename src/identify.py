@@ -11,13 +11,13 @@ from utils import (
     pandas_timestamp_to_zulu_format,
     dump_data_frame_to_feather_file,
     read_data_frame_from_feather_file,
+    get_exclusion_radius,
 )
 
 
 class map_colors:
     exclusion_zone = "#ad2727"
     inclusion_zone = "#27ad27"
-
 
 def plot_map(
     deployment,
@@ -94,7 +94,9 @@ def generate_csv(
     data_frame,
     minimum_consecutive_minutes=30,
     is_background=True,
-    csv_name="file.csv"
+    csv_name="file.csv",
+    descending=True,
+    unique=True,
     ):
 
     list_of_data_to_fetch = {}
@@ -102,10 +104,9 @@ def generate_csv(
     # We need to incrementally enforce uniqueness so that each sample is statistically isolated.
     # That is to say, if an interval is selected at 10000 meters, it needs to be removed from all closer ranges.
     descending_keys = list(interval_dicts.keys())
-    descending_keys.sort(reverse=True)
+    descending_keys.sort(reverse=descending)
 
-    print(f"Identifying consecutively time intervals and saving to feather file...")
-    for distance_index, key in tqdm(enumerate(descending_keys)):
+    for distance_index, key in enumerate(descending_keys):
 
         # Create a temporary DataFrame with a single column.
         temporary_data_frame = pd.DataFrame(
@@ -169,18 +170,23 @@ def generate_csv(
             )
 
 
-        # Having the reference list as a set makes the look-up an O(1) operation instead of an O(N) for a list.
-        # Utterly hilarious difference in performance between those two with large lists.
-        reference_list = set(temporary_data_frame["closed_left"])
+        # Only remove items from dict if uniqueness is desired.
+        if unique:
+            # We need to incrementally enforce uniqueness so that each sample is statistically isolated.
+            # That is to say, if an interval is selected at 10000 meters, it needs to be removed from all closer ranges.
 
-        for modify_index in range(distance_index + 1, len(descending_keys)):
-            interval_dicts[descending_keys[modify_index]] = [
-                value
-                for value in interval_dicts[
-                    descending_keys[modify_index]
+            # Having the reference list as a set makes the look-up an O(1) operation instead of an O(N) for a list.
+            # Utterly hilarious difference in performance between those two with large lists.
+            reference_list = set(temporary_data_frame["closed_left"])
+
+            for modify_index in range(distance_index + 1, len(descending_keys)):
+                interval_dicts[descending_keys[modify_index]] = [
+                    value
+                    for value in interval_dicts[
+                        descending_keys[modify_index]
+                    ]
+                    if value not in reference_list
                 ]
-                if value not in reference_list
-            ]
 
     file_name = "_".join(
         [
@@ -252,14 +258,13 @@ def generate_csv(
 
     output_file.close()
 
-
 def identify_scenarios(
     working_directory,
     deployment_directory,
     scenario_intervals_directory,
     interval_ais_data_directory,
     combined_deployment_directory,
-):
+    ):
 
     # Read in the hydrophone deployments as we will treat each deployment as an individual dataset.
     hydrophone_deployments = get_hydrophone_deployments(deployment_directory)
@@ -299,7 +304,6 @@ def identify_scenarios(
             inclusion_radii = np.arange(
                 minimum_distance, maximum_distance + distance_step, distance_step
             )
-            exclusion_radius_offset = 2000
 
             data_frame = data_frame.sort_values(by=["pd_timestamp"])
 
@@ -323,17 +327,17 @@ def identify_scenarios(
                 pd.Grouper(freq="1Min", offset="0Min", label="left")
             )
 
-            reporting_day = (
-                grouped_by_time_intervals.first().iloc[0]["pd_timestamp"].normalize()
-            )
+            #reporting_day = (
+            #    grouped_by_time_intervals.first().iloc[0]["pd_timestamp"].normalize()
+            #)
 
-            print(f"Processing day {reporting_day} now...")
+            #print(f"Processing day {reporting_day} now...")
 
             # Due to the size of the primary DataFrame, we only really want to iterate through the entire thing once, so the interval is top.
             for interval_left, interval_data in tqdm(grouped_by_time_intervals):
 
                 for inclusion_radius in inclusion_radii:
-                    exclusion_radius = inclusion_radius + exclusion_radius_offset
+                    exclusion_radius = get_exclusion_radius(inclusion_radius)
 
                     # No entries within exclusion range means that we can use this interval for background noise estimation.
                     if (sum(interval_data["distance_to_hydrophone"] <= exclusion_radius) == 0):
@@ -406,6 +410,7 @@ def identify_scenarios(
             print(f"  Finished identifying all scenarios...")
 
             # Find unique background intervals.
+            print(f"Saving background intervals")
             generate_csv(
                 background_noise_interval_dicts,
                 device,
@@ -418,18 +423,39 @@ def identify_scenarios(
                 is_background=True,
                 csv_name="background_intervals.csv"
             )
+            print(f"  Finished saving...")
 
             # Find unique inclusion intervals.
+            print(f"Saving complete vessel intervals")
             generate_csv(
-                inclusion_exclusion_interval_dicts,
+                inclusion_exclusion_interval_dicts.copy(),
                 device,
                 deployment_begin,
                 deployment_end,
                 scenario_intervals_directory,
                 interval_ais_data_directory,
                 data_frame,
-                minimum_consecutive_minutes=5,
+                minimum_consecutive_minutes=2,
                 is_background=False,
-                csv_name="unique_vessel_intervals.csv"
+                csv_name="all_vessel_intervals.csv",
+                descending=False,
+                unique=False,
             )
-
+            print(f"  Finished saving...")
+            
+            # Find unique inclusion intervals from shortest radius to longest.
+            print(f"Saving statistically isolated vessel intervals")
+            generate_csv(
+                inclusion_exclusion_interval_dicts.copy(),
+                device,
+                deployment_begin,
+                deployment_end,
+                scenario_intervals_directory,
+                interval_ais_data_directory,
+                data_frame,
+                minimum_consecutive_minutes=2,
+                is_background=False,
+                csv_name="unique_vessel_intervals.csv",
+                descending=False,
+            )
+            print(f"  Finished saving...")

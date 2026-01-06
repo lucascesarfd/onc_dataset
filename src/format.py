@@ -1,11 +1,12 @@
 import os
+import sys
 
 import pandas as pd
 
 from tqdm import tqdm
 from pydub import AudioSegment
 from datetime import timedelta
-from utils import create_dir, zulu_string_to_datetime, pandas_timestamp_to_onc_format
+from utils import create_dir, zulu_string_to_datetime, pandas_timestamp_to_onc_format, get_exclusion_radius
 
 
 def find_in_range_wav(data_from_range, wav_file_list):
@@ -55,14 +56,16 @@ def split_and_save_wav(raw_wav_directory, output_save_dir, data_from_range, wav_
                 wav_files_in_range.append((wav_datetime, wav_file))
 
         if len(wav_files_in_range) == 0:
+            print(f"No files within range for idx {file_idx}")
             continue
 
         wav_files_in_range.sort()
 
         try:
             audio_segment = AudioSegment.from_wav(os.path.join(raw_wav_directory, wav_files_in_range[0][1]))
-            start_time = (ais_begin_datetime - wav_files_in_range[0][0]).total_seconds() * 1000
-            audio_segment = audio_segment[start_time:]
+            if wav_files_in_range[0][0] < ais_begin_datetime:
+                start_time = (ais_begin_datetime - wav_files_in_range[0][0]).total_seconds() * 1000
+                audio_segment = audio_segment[start_time:]
 
             for idx, (wav_datetime, wav_file_name) in enumerate(wav_files_in_range[:-1]):
                 if idx == 0:
@@ -81,6 +84,8 @@ def split_and_save_wav(raw_wav_directory, output_save_dir, data_from_range, wav_
                         str(file_idx),
                     )
                 )
+        except KeyboardInterrupt:
+            sys.exit()
         except:
             print(f"Error while exporting {file_idx} audio segment")
             continue
@@ -94,10 +99,10 @@ def split_and_save_wav(raw_wav_directory, output_save_dir, data_from_range, wav_
     interval_csv_file.close()
 
 
-def group_wav_from_range(classified_wav_directory, scenario_interval_dir, interval_ais_data_directory, raw_wav_directory, inclusion_radius):
+def group_wav_from_range(classified_wav_directory, scenario_interval_dir, interval_ais_data_directory, raw_wav_directory, inclusion_radius, unique=True):
 
     # Define exclusion range as an offset from the inclusion.
-    exclusion_radius = 2000 + inclusion_radius
+    exclusion_radius = get_exclusion_radius(inclusion_radius)
 
     directory_name = "inclusion_" + str(inclusion_radius) + "_exclusion_" + str(exclusion_radius)
     range_directory = create_dir(classified_wav_directory, directory_name)
@@ -108,7 +113,8 @@ def group_wav_from_range(classified_wav_directory, scenario_interval_dir, interv
     interval_file_names = os.listdir(scenario_interval_dir)
 
     # Read vessel intervals range data from csv.
-    vessel_interval_file_names = [file for file in interval_file_names if file.lower().endswith('unique_vessel_intervals.csv')]
+    csv_name = 'unique_vessel_intervals.csv' if unique else 'all_vessel_intervals.csv'
+    vessel_interval_file_names = [file for file in interval_file_names if file.lower().endswith(csv_name)]
     vessel_interval_data = pd.read_csv(os.path.join(scenario_interval_dir, vessel_interval_file_names[0]))
 
     # Get data from only the selected inclusion/exclusion range.
